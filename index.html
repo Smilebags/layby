@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#efe6d6">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#14110e">
+  <meta name="description" content="Offline driving log. Records the GPS start and end of each trip, and ends a trip after five minutes still.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Layby">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https://tile.openstreetmap.org; style-src 'self'; script-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'">
+  <title>Layby</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <p id="live" class="sr-only" role="status"></p>
+  <div class="app">
+    <header class="top">
+      <div class="brand">
+        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+          <rect width="32" height="32" rx="8" fill="#202c26"/>
+          <circle cx="16" cy="13" r="5.2" fill="none" stroke="#f4efe6" stroke-width="1.7"/>
+          <circle cx="16" cy="13" r="2.2" fill="#f0a35e"/>
+          <rect x="18" y="18.2" width="6" height="2.2" rx="1" fill="#c5d2b3"/>
+          <rect x="7" y="21" width="18" height="2.3" rx="1.1" fill="#f4efe6"/>
+        </svg>
+        <div>
+          <p class="name">Layby</p>
+          <p class="tag">Driving log</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <p class="chip" id="storage">On this device</p>
+        <p class="chip" id="wake" hidden>Screen stays on</p>
+        <button type="button" class="chip-button" id="install" hidden>Install</button>
+      </div>
+    </header>
+    <main>
+      <section class="deck" id="deck" data-phase="idle" aria-labelledby="phase-label">
+        <p class="error" id="error" hidden></p>
+        <p class="phase"><span class="dot" aria-hidden="true"></span><span id="phase-label">Ready</span></p>
+        <div class="dial" id="dial">
+          <div class="dial-progress" aria-hidden="true"></div>
+          <div class="dial-face">
+            <p class="caption" id="caption">Ready</p>
+            <p class="clock" id="clock">0:00</p>
+          </div>
+        </div>
+        <p class="route" id="route">No trip in progress.</p>
+        <div class="meters" aria-label="Trip instruments">
+          <div><strong id="speed">–</strong><span>km/h</span></div>
+          <div><strong id="travelled">0 m</strong><span>Travelled</span></div>
+          <div><strong id="still">–</strong><span>Still</span></div>
+        </div>
+        <p class="hint" id="hint">This is the new Layby. Tap Start and allow location. A trip ends after five minutes in one place, or when you end it here.</p>
+        <p class="accuracy" id="accuracy"></p>
+        <div class="actions">
+          <button type="button" class="primary" id="primary">Start</button>
+          <button type="button" class="ghost" id="file" hidden>End trip</button>
+          <button type="button" class="ghost danger" id="discard" hidden>Discard</button>
+        </div>
+      </section>
+      <section class="log" aria-labelledby="log-title">
+        <div class="log-head">
+          <h2 id="log-title">Trips</h2>
+          <div class="log-tools">
+            <p id="count"></p>
+            <button type="button" class="ghost compact" id="add-trip">Add trip</button>
+          </div>
+        </div>
+        <p id="total" class="trip-total" hidden></p>
+        <div class="trip-wrap">
+          <table class="trip-table">
+            <thead>
+              <tr>
+                <th scope="col">Date</th>
+                <th scope="col">Trip</th>
+                <th scope="col">Start</th>
+                <th scope="col">Duration</th>
+                <th scope="col"><span class="sr-only">Edit</span></th>
+              </tr>
+            </thead>
+            <tbody id="list"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+    <footer>
+      <p>After this page has loaded once, it keeps working with no connection. Positions and times stay on this device.</p>
+      <details class="debug">
+        <summary>Debug</summary>
+        <p class="debug-note">Tap Start, then copy this log.</p>
+        <pre id="debug-log" tabindex="0"></pre>
+        <button type="button" class="ghost compact" id="debug-copy">Copy log</button>
+      </details>
+    </footer>
+    <div class="log-transfer">
+      <button type="button" class="ghost compact" id="export-json">Save JSON file</button>
+      <button type="button" class="ghost compact" id="copy-json">Copy JSON</button>
+      <button type="button" class="ghost compact" id="import-json">Load JSON file</button>
+      <button type="button" class="ghost compact" id="paste-json">Paste JSON</button>
+      <input type="file" id="import-file" accept="application/json,.json" hidden>
+    </div>
+  </div>
+  <dialog id="import" aria-labelledby="import-title">
+    <form id="import-form">
+      <h3 id="import-title">Add a trip</h3>
+      <p class="dialog-note" id="import-note">Enter the two times, then tap the map for the start and the end. Street tiles load when you are online.</p>
+      <div class="times">
+        <label>Start time
+          <input type="datetime-local" id="import-start" required step="1">
+        </label>
+        <label>End time
+          <input type="datetime-local" id="import-end" required step="1">
+        </label>
+      </div>
+      <div class="place-pick" role="group" aria-label="Which place the next map tap sets">
+        <button type="button" id="pick-start" aria-pressed="true">Start on map</button>
+        <button type="button" id="pick-end" aria-pressed="false">End on map</button>
+      </div>
+      <div id="map" role="application" aria-label="Map. Tap to place the selected location."></div>
+      <p class="pick-readout" id="pick-readout">Start not placed. End not placed.</p>
+      <p class="import-error" id="import-error" hidden></p>
+      <div class="actions">
+        <button type="submit" class="primary" id="import-save">Save trip</button>
+        <button type="button" class="ghost" id="import-cancel">Cancel</button>
+        <button type="button" class="ghost danger" id="import-remove" hidden>Remove</button>
+      </div>
+      <p class="map-credit">Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a></p>
+    </form>
+  </dialog>
+  <p class="toast" id="toast" hidden role="status"></p>
+  <noscript><p class="noscript">Layby needs JavaScript to read GPS and keep the log on this device.</p></noscript>
+  <script src="./vendor/leaflet/leaflet.js"></script>
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
