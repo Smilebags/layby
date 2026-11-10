@@ -98,6 +98,14 @@ button { cursor: pointer; }
   line-height: 0.95;
   letter-spacing: -0.03em;
 }
+.version {
+  margin-left: 6px;
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  vertical-align: 0.35em;
+}
 .tag {
   margin: 2px 0 0;
   color: var(--muted);
