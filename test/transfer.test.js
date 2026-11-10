@@ -9,9 +9,7 @@ const trip = {
   distanceM: 1200,
   start: { lat: -43.09274, lon: 147.26189 },
   end: { lat: -42.8821, lon: 147.3251 },
-  startPostcode: "",
   startAddress: "",
-  endPostcode: "",
   endAddress: "",
 };
 
@@ -47,6 +45,16 @@ test("a missing distance is filled from the two points", () => {
   const copy = { ...trip, distanceM: undefined };
   const result = recordsFromImport(JSON.stringify([copy]));
   assert.ok(result.trips[0].distanceM > 0);
+});
+
+test("postcodes are dropped from export and import", () => {
+  const withPostcode = { ...trip, startPostcode: "7054", endPostcode: "7000" };
+  const exported = tripDocument([withPostcode]);
+  assert.equal("startPostcode" in exported.trips[0], false);
+  assert.equal("endPostcode" in exported.trips[0], false);
+  const imported = recordsFromImport(JSON.stringify([withPostcode]));
+  assert.equal("startPostcode" in imported.trips[0], false);
+  assert.equal("endPostcode" in imported.trips[0], false);
 });
 
 test("text that is not a trip list is refused", () => {

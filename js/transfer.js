@@ -44,9 +44,7 @@ function exportTrip(trip) {
     distanceM: trip.distanceM,
     start: { lat: trip.start.lat, lon: trip.start.lon },
     end: { lat: trip.end.lat, lon: trip.end.lon },
-    startPostcode: text(trip.startPostcode),
     startAddress: text(trip.startAddress),
-    endPostcode: text(trip.endPostcode),
     endAddress: text(trip.endAddress),
   };
 }
@@ -66,9 +64,7 @@ function normalizeTrip(row) {
     distanceM: Number.isFinite(distance) && distance >= 0 ? Math.round(distance) : Math.round(haversineMeters(start, end)),
     start,
     end,
-    startPostcode: text(row.startPostcode),
     startAddress: text(row.startAddress),
-    endPostcode: text(row.endPostcode),
     endAddress: text(row.endAddress),
   };
 }

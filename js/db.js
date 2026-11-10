@@ -32,6 +32,7 @@ function requestResult(request) {
 }
 
 export async function addTrip(record) {
+  omitPostcode(record);
   const database = await db();
   const tx = database.transaction(STORE, "readwrite");
   const id = await requestResult(tx.objectStore(STORE).add(record));
@@ -40,8 +41,20 @@ export async function addTrip(record) {
 
 export async function listTrips() {
   const database = await db();
-  const tx = database.transaction(STORE, "readonly");
-  const rows = await requestResult(tx.objectStore(STORE).getAll());
+  const read = database.transaction(STORE, "readonly");
+  const finished = transactionDone(read);
+  const rows = await requestResult(read.objectStore(STORE).getAll());
+  await finished;
+  const stale = rows.filter((row) => "startPostcode" in row || "endPostcode" in row);
+  if (stale.length) {
+    const write = database.transaction(STORE, "readwrite");
+    const store = write.objectStore(STORE);
+    for (const row of stale) {
+      omitPostcode(row);
+      store.put(row);
+    }
+    await transactionDone(write);
+  }
   rows.sort((a, b) => b.startedAt - a.startedAt);
   return rows;
 }
@@ -53,8 +66,21 @@ export async function updateTrip(id, patch) {
   const record = await requestResult(store.get(id));
   if (!record) throw new Error("Trip is missing");
   Object.assign(record, patch);
+  omitPostcode(record);
   await requestResult(store.put(record));
   return record;
+}
+
+function omitPostcode(record) {
+  delete record.startPostcode;
+  delete record.endPostcode;
+}
+
+function transactionDone(tx) {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
 }
 
 export async function deleteTrip(id) {

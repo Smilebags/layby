@@ -495,9 +495,7 @@ async function fileTrip(finished) {
     distanceM: Math.round(finished.distanceM),
     start: roundPoint(finished.start),
     end: roundPoint(finished.end),
-    startPostcode: "",
     startAddress: "",
-    endPostcode: "",
     endAddress: "",
   };
   try {
@@ -971,9 +969,7 @@ async function saveImport() {
     if (editingId == null) {
       const record = {
         ...patch,
-        startPostcode: "",
         startAddress: "",
-        endPostcode: "",
         endAddress: "",
       };
       record.id = await addTrip(record);

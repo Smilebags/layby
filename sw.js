@@ -1,4 +1,4 @@
-const CACHE = "layby-v13";
+const CACHE = "layby-v16";
 const ASSETS = [
   "index.html",
   "styles.css",
