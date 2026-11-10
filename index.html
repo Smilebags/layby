@@ -107,6 +107,15 @@
       <input type="file" id="import-file" accept="application/json,.json" hidden>
     </div>
   </div>
+  <dialog id="import-choice" aria-labelledby="import-choice-title">
+    <h3 id="import-choice-title">Import trips</h3>
+    <p class="dialog-note" id="import-choice-note"></p>
+    <div class="actions">
+      <button type="button" class="primary" id="import-merge">Merge</button>
+      <button type="button" class="ghost danger" id="import-replace">Replace</button>
+      <button type="button" class="ghost" id="import-choice-cancel">Cancel</button>
+    </div>
+  </dialog>
   <dialog id="import" aria-labelledby="import-title">
     <form id="import-form">
       <h3 id="import-title">Add a trip</h3>

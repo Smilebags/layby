@@ -408,7 +408,8 @@ footer p { margin: 0; max-width: 46rem; }
   padding: 12px;
 }
 
-#import {
+#import,
+#import-choice {
   width: min(560px, calc(100vw - 24px));
   max-height: calc(100dvh - 24px);
   margin: auto;
@@ -420,8 +421,10 @@ footer p { margin: 0; max-width: 46rem; }
   color: var(--ink);
   box-shadow: var(--shadow);
 }
-#import::backdrop { background: rgba(20, 17, 14, 0.55); }
-#import h3 {
+#import::backdrop,
+#import-choice::backdrop { background: rgba(20, 17, 14, 0.55); }
+#import h3,
+#import-choice h3 {
   margin: 0 0 6px;
   font-family: var(--serif);
   font-size: 1.6rem;
@@ -432,6 +435,10 @@ footer p { margin: 0; max-width: 46rem; }
   color: var(--muted);
   font-size: 0.92rem;
 }
+#import-choice {
+  width: min(420px, calc(100vw - 24px));
+}
+#import-choice .actions { margin-top: 16px; }
 .times {
   display: grid;
   gap: 10px;

@@ -32,7 +32,7 @@ function requestResult(request) {
 }
 
 export async function addTrip(record) {
-  omitPostcode(record);
+  omitStoredExtras(record);
   const database = await db();
   const tx = database.transaction(STORE, "readwrite");
   const id = await requestResult(tx.objectStore(STORE).add(record));
@@ -45,12 +45,12 @@ export async function listTrips() {
   const finished = transactionDone(read);
   const rows = await requestResult(read.objectStore(STORE).getAll());
   await finished;
-  const stale = rows.filter((row) => "startPostcode" in row || "endPostcode" in row);
+  const stale = rows.filter((row) => STORED_EXTRAS.some((key) => key in row));
   if (stale.length) {
     const write = database.transaction(STORE, "readwrite");
     const store = write.objectStore(STORE);
     for (const row of stale) {
-      omitPostcode(row);
+      omitStoredExtras(row);
       store.put(row);
     }
     await transactionDone(write);
@@ -66,14 +66,15 @@ export async function updateTrip(id, patch) {
   const record = await requestResult(store.get(id));
   if (!record) throw new Error("Trip is missing");
   Object.assign(record, patch);
-  omitPostcode(record);
+  omitStoredExtras(record);
   await requestResult(store.put(record));
   return record;
 }
 
-function omitPostcode(record) {
-  delete record.startPostcode;
-  delete record.endPostcode;
+const STORED_EXTRAS = ["startPostcode", "endPostcode", "startAddress", "endAddress", "distanceM"];
+
+function omitStoredExtras(record) {
+  for (const key of STORED_EXTRAS) delete record[key];
 }
 
 function transactionDone(tx) {
@@ -87,4 +88,16 @@ export async function deleteTrip(id) {
   const database = await db();
   const tx = database.transaction(STORE, "readwrite");
   await requestResult(tx.objectStore(STORE).delete(id));
+}
+
+export async function replaceTrips(records) {
+  const database = await db();
+  const tx = database.transaction(STORE, "readwrite");
+  const store = tx.objectStore(STORE);
+  store.clear();
+  for (const record of records) {
+    omitStoredExtras(record);
+    store.add(record);
+  }
+  await transactionDone(tx);
 }

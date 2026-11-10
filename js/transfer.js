@@ -1,5 +1,3 @@
-import { haversineMeters } from "./geo.js";
-
 export function tripDocument(trips) {
   return {
     layby: 1,
@@ -41,11 +39,8 @@ function exportTrip(trip) {
   return {
     startedAt: trip.startedAt,
     endedAt: trip.endedAt,
-    distanceM: trip.distanceM,
     start: { lat: trip.start.lat, lon: trip.start.lon },
     end: { lat: trip.end.lat, lon: trip.end.lon },
-    startAddress: text(trip.startAddress),
-    endAddress: text(trip.endAddress),
   };
 }
 
@@ -57,16 +52,7 @@ function normalizeTrip(row) {
   const end = point(row.end);
   if (!Number.isFinite(startedAt) || !Number.isFinite(endedAt) || endedAt <= startedAt) return null;
   if (!start || !end) return null;
-  const distance = Number(row.distanceM);
-  return {
-    startedAt,
-    endedAt,
-    distanceM: Number.isFinite(distance) && distance >= 0 ? Math.round(distance) : Math.round(haversineMeters(start, end)),
-    start,
-    end,
-    startAddress: text(row.startAddress),
-    endAddress: text(row.endAddress),
-  };
+  return { startedAt, endedAt, start, end };
 }
 
 function point(value) {
@@ -75,10 +61,6 @@ function point(value) {
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
   if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
   return { lat, lon };
-}
-
-function text(value) {
-  return typeof value === "string" ? value : "";
 }
 
 function tripKey(trip) {

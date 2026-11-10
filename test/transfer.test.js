@@ -9,17 +9,20 @@ const trip = {
   distanceM: 1200,
   start: { lat: -43.09274, lon: 147.26189 },
   end: { lat: -42.8821, lon: 147.3251 },
-  startAddress: "",
-  endAddress: "",
+  startAddress: "kept out",
+  endAddress: "kept out",
 };
 
-test("an export keeps the trip fields and drops the local id", () => {
+test("an export keeps the times and points", () => {
   const document = tripDocument([trip]);
   assert.equal(document.layby, 1);
   assert.equal(document.trips.length, 1);
-  assert.equal("id" in document.trips[0], false);
-  assert.equal(document.trips[0].distanceM, 1200);
-  assert.deepEqual(document.trips[0].start, trip.start);
+  assert.deepEqual(document.trips[0], {
+    startedAt: 1_000,
+    endedAt: 61_000,
+    start: trip.start,
+    end: trip.end,
+  });
 });
 
 test("an import accepts the export and a bare list", () => {
@@ -41,20 +44,15 @@ test("an import skips duplicates and unreadable rows", () => {
   assert.equal(result.unreadable, 2);
 });
 
-test("a missing distance is filled from the two points", () => {
-  const copy = { ...trip, distanceM: undefined };
-  const result = recordsFromImport(JSON.stringify([copy]));
-  assert.ok(result.trips[0].distanceM > 0);
-});
-
-test("postcodes are dropped from export and import", () => {
-  const withPostcode = { ...trip, startPostcode: "7054", endPostcode: "7000" };
-  const exported = tripDocument([withPostcode]);
+test("postcodes, addresses, and distance are dropped", () => {
+  const withExtras = { ...trip, startPostcode: "7054", endPostcode: "7000" };
+  const exported = tripDocument([withExtras]);
+  assert.equal("distanceM" in exported.trips[0], false);
+  assert.equal("startAddress" in exported.trips[0], false);
+  assert.equal("endAddress" in exported.trips[0], false);
   assert.equal("startPostcode" in exported.trips[0], false);
-  assert.equal("endPostcode" in exported.trips[0], false);
-  const imported = recordsFromImport(JSON.stringify([withPostcode]));
-  assert.equal("startPostcode" in imported.trips[0], false);
-  assert.equal("endPostcode" in imported.trips[0], false);
+  const imported = recordsFromImport(JSON.stringify([withExtras]));
+  assert.deepEqual(Object.keys(imported.trips[0]).sort(), ["end", "endedAt", "start", "startedAt"]);
 });
 
 test("text that is not a trip list is refused", () => {

@@ -1,6 +1,6 @@
 import { createTracker } from "./tracker.js";
 import { haversineMeters } from "./geo.js";
-import { addTrip, deleteTrip, listTrips, updateTrip } from "./db.js";
+import { addTrip, deleteTrip, listTrips, replaceTrips, updateTrip } from "./db.js";
 import { nearestPlace } from "./places.js";
 import { recordsFromImport, tripDocument } from "./transfer.js";
 import {
@@ -492,11 +492,8 @@ async function fileTrip(finished) {
   const record = {
     startedAt: finished.startedAt,
     endedAt: finished.endedAt,
-    distanceM: Math.round(finished.distanceM),
     start: roundPoint(finished.start),
     end: roundPoint(finished.end),
-    startAddress: "",
-    endAddress: "",
   };
   try {
     record.id = await addTrip(record);
@@ -641,6 +638,28 @@ const copyJsonButton = document.querySelector("#copy-json");
 const importJsonButton = document.querySelector("#import-json");
 const pasteJsonButton = document.querySelector("#paste-json");
 const importFile = document.querySelector("#import-file");
+const importChoice = document.querySelector("#import-choice");
+const importChoiceNote = document.querySelector("#import-choice-note");
+
+let pendingImportChoice = null;
+
+function finishImportChoice(mode) {
+  const resolve = pendingImportChoice;
+  pendingImportChoice = null;
+  if (importChoice.open) importChoice.close(mode);
+  resolve?.(mode);
+}
+
+document.querySelector("#import-merge").addEventListener("click", () => finishImportChoice("merge"));
+document.querySelector("#import-replace").addEventListener("click", () => finishImportChoice("replace"));
+document.querySelector("#import-choice-cancel").addEventListener("click", () => finishImportChoice("cancel"));
+importChoice.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  finishImportChoice("cancel");
+});
+importChoice.addEventListener("close", () => {
+  if (pendingImportChoice) finishImportChoice("cancel");
+});
 
 exportJsonButton.addEventListener("click", saveTripFile);
 copyJsonButton.addEventListener("click", copyTripJson);
@@ -707,6 +726,31 @@ async function pasteTripJson() {
 }
 
 async function importTripText(text) {
+  const incoming = recordsFromImport(text);
+  if (!incoming.trips.length) {
+    showError("Nothing in that JSON could be imported.");
+    return;
+  }
+  const mode = trips.length ? await chooseImportMode(incoming) : "add";
+  if (mode === "merge") await mergeImported(text);
+  else if (mode === "replace" || mode === "add") await replaceImported(incoming, mode);
+}
+
+function chooseImportMode(incoming) {
+  const kept = tripCount(trips.length);
+  const found = tripCount(incoming.trips.length);
+  let note = `This log already has ${kept}. This file has ${found}.`;
+  if (incoming.unreadable) note += ` ${incoming.unreadable} could not be read.`;
+  if (incoming.duplicate) note += ` ${incoming.duplicate} repeated in the file will be skipped.`;
+  note += " Merge keeps the trips already here and adds the rest. Replace removes the trips already here.";
+  importChoiceNote.textContent = note;
+  importChoice.showModal();
+  return new Promise((resolve) => {
+    pendingImportChoice = resolve;
+  });
+}
+
+async function mergeImported(text) {
   const result = recordsFromImport(text, trips);
   if (!result.trips.length) {
     showError(result.duplicate && !result.unreadable
@@ -719,13 +763,32 @@ async function importTripText(text) {
   const skipped = [];
   if (result.duplicate) skipped.push(`${result.duplicate} already saved`);
   if (result.unreadable) skipped.push(`${result.unreadable} unreadable`);
-  const count = result.trips.length === 1 ? "1 trip" : `${result.trips.length} trips`;
-  live.textContent = skipped.length ? `Imported ${count}. Skipped ${skipped.join(" and ")}.` : `Imported ${count}.`;
+  live.textContent = skipped.length
+    ? `Merged ${tripCount(result.trips.length)}. Skipped ${skipped.join(" and ")}.`
+    : `Merged ${tripCount(result.trips.length)}.`;
+  await refresh();
+}
+
+async function replaceImported(incoming, mode) {
+  await replaceTrips(incoming.trips);
+  trips = [];
+  showError("");
+  const skipped = [];
+  if (incoming.duplicate) skipped.push(`${incoming.duplicate} repeated`);
+  if (incoming.unreadable) skipped.push(`${incoming.unreadable} unreadable`);
+  const lead = mode === "replace"
+    ? `Replaced the log with ${tripCount(incoming.trips.length)}`
+    : `Imported ${tripCount(incoming.trips.length)}`;
+  live.textContent = skipped.length ? `${lead}. Skipped ${skipped.join(" and ")}.` : `${lead}.`;
   await refresh();
 }
 
 function countPhrase(count, verb) {
-  return `${verb} ${count === 1 ? "1 trip" : `${count} trips`}.`;
+  return `${verb} ${tripCount(count)}.`;
+}
+
+function tripCount(count) {
+  return count === 1 ? "1 trip" : `${count} trips`;
 }
 
 importCancel.addEventListener("click", () => importDialog.close());
@@ -961,17 +1024,12 @@ async function saveImport() {
   const patch = {
     startedAt,
     endedAt,
-    distanceM: Math.round(haversineMeters(importPicks.start, importPicks.end)),
     start: roundPoint(importPicks.start),
     end: roundPoint(importPicks.end),
   };
   try {
     if (editingId == null) {
-      const record = {
-        ...patch,
-        startAddress: "",
-        endAddress: "",
-      };
+      const record = { ...patch };
       record.id = await addTrip(record);
       importDialog.close();
       announce(record);
